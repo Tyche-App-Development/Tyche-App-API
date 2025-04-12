@@ -2,15 +2,30 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../ConfigDatabase/db.js';
 
+
 export const register = async (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, email, password, fullName, nif ,age = 0, imageProfile = null } = req.body;
 
     try {
+
         const passwordHash = await bcrypt.hash(password, 10);
 
         const user = await prisma.user.create({
-            data: { username, password: passwordHash, apiKey: crypto.randomUUID() },
+            data: {
+                username,
+                email,
+                fullName,
+                password: passwordHash,
+                age,
+                nif,
+                imageProfile,
+                apiKey: crypto.randomUUID(),
+                amount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
         });
+
 
         res.status(201).json({ message: 'User successfully created', user });
     } catch (err) {
@@ -18,6 +33,7 @@ export const register = async (req, res) => {
         res.status(500).json({ message: 'Error creating user' });
     }
 };
+
 
 export const login = async (req, res) => {
     const { username, password } = req.body;
