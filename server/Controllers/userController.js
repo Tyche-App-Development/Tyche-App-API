@@ -9,7 +9,7 @@ export const getProfile = async (req, res) => {
         const token = req.headers.authorization?.split(' ')[1];
 
         if (!token) {
-            return res.status(401).json({ message: 'Token não fornecido' });
+            return res.status(401).json({ message: 'Token not provider' });
         }
 
 
@@ -21,6 +21,9 @@ export const getProfile = async (req, res) => {
             select: {
                 id: true,
                 username: true,
+                fullName: true,
+                email: true,
+                nif: true,
                 age: true,
                 imageProfile: true,
                 apiKey: true,
@@ -31,13 +34,13 @@ export const getProfile = async (req, res) => {
         });
 
         if (!user) {
-            return res.status(404).json({ message: 'Usuário não encontrado' });
+            return res.status(404).json({ message: 'User not found!' });
         }
 
         res.json({ user });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Erro ao obter o perfil', error: err.message });
+        res.status(500).json({ message: 'Error', error: err.message });
     }
 };
 

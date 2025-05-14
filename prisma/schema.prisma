@@ -10,13 +10,16 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://admin:admin@localhost:5438/tyche"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique
-  password     String
+  email        String   @unique
+  fullName    String
+  nif         String   @unique
+  password String
   age          Int      @default(0)
   imageProfile String?
   apiKey       String   @unique
