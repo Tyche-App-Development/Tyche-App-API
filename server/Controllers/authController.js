@@ -1,36 +1,61 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../ConfigDatabase/db.js';
+import { encrypt } from '../utils/cryptoUtils.js';
+import crypto from 'crypto';
 
 
 export const register = async (req, res) => {
-    const { username, email, password, fullName, nif ,age = 0, imageProfile = null } = req.body;
+    const {
+        username,
+        password,
+        name,
+        email,
+        balance,
+        nif,
+        age = 0,
+        imageProfile = null,
+        apiKey,
+        apiSecret
+    } = req.body;
 
     try {
 
+        if (!apiKey || !apiSecret) {
+            return res.status(400).json({ message: 'Binance API Key and Secret are required' });
+        }
+
         const passwordHash = await bcrypt.hash(password, 10);
+
+        const encryptedApiKey = encrypt(apiKey);
+        const encryptedApiSecret = encrypt(apiSecret);
 
         const user = await prisma.user.create({
             data: {
                 username,
+                name,
                 email,
-                fullName,
                 password: passwordHash,
                 age,
+                balance,
                 nif,
                 imageProfile,
-                apiKey: crypto.randomUUID(),
-                amount: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
+                apiKey: encryptedApiKey,
+                apiSecret: encryptedApiSecret,
             },
         });
 
-
-        res.status(201).json({ message: 'User successfully created', user });
+        res.status(201).json({
+            message: 'User successfully created',
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email
+            }
+        });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Error creating user' });
+        res.status(500).json({ message: 'Error creating user', error: err.message });
     }
 };
 

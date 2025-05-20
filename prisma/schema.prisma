@@ -1,8 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma schema baseado no diagrama fornecido
 
 generator client {
   provider = "prisma-client-js"
@@ -14,16 +10,86 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  email        String   @unique
-  fullName     String
-  nif          String   @unique
-  password     String
-  age          Int      @default(0)
-  imageProfile String?
-  apiKey       String   @unique
-  amount       Float    @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String           @id @default(uuid())
+  username      String           @unique
+  password      String
+  name          String
+  email         String           @unique
+  age           Int
+  apiKey        String
+  apiSecret     String
+  balance       Float
+  imageProfile  Bytes?
+  nif           String          @unique
+  historyTrades HistoryTrade[]
+  strategies    UserStrategy[]
+}
+
+model HistoryTrade {
+  id           String   @id @default(uuid())
+  id_user      String
+  symbol       String
+  price        Float
+  amount       Int
+  quoteQuantity Float
+  gain_loss    Float
+  isBuyer      Boolean
+  timestamp    DateTime
+
+  user         User     @relation(fields: [id_user], references: [id])
+}
+
+model PriceData {
+  id          Int              @id @default(autoincrement())
+  timestamp   DateTime
+  price       Float
+  volume      Float
+  ma_7        Float
+  ma_25       Float
+  ma_99       Float
+  rsi         Float
+  macd        Float
+  dea         Float
+  diff        Float
+
+  strategies  UserStrategy[]
+}
+
+
+model UserStrategy {
+  id             Int       @id @default(autoincrement())
+  id_user        String
+  id_bot         Int
+  id_priceData   Int
+
+  symbol         String
+  status         Boolean
+  buy_price      Float
+  coinAmount     Float
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  user           User      @relation(fields: [id_user], references: [id])
+  bot            Bot       @relation(fields: [id_bot], references: [id])
+  priceData      PriceData @relation(fields: [id_priceData], references: [id])
+}
+
+
+model Bot {
+  id                 Int       @id @default(autoincrement())
+  strategyName       String
+  strategyRisk       String
+  strategyDescription String
+  timeInterval       String
+  defaultMaShort     Float
+  defaultMaMid       Float
+  defaultMaLong      Float
+  defaultRSIPeriod   Float
+  defaultMacdFast    Float
+  defaultMacdSlow    Float
+  defaultMacdSignal  Float
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  strategies         UserStrategy[]
 }
