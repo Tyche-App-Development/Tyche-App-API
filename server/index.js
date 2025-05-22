@@ -5,6 +5,7 @@ import http from 'http';
 import authRoutes from './routes/authRoutes.js';
 import { setupBinanceTickerSocket } from './services/binanceTickerSocket.js';
 
+
 dotenv.config();
 
 const app = express();

@@ -8,6 +8,7 @@
     "start": "nodemon index.js"
   },
   "dependencies": {
+    "@binance/connector": "^3.6.1",
     "@types/passport": "^1.0.17",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",

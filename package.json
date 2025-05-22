@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@binance/spot": "^6.0.0",
     "@prisma/client": "^6.5.0",
     "bcrypt": "^5.1.1",
     "ccxt": "^4.4.82",
