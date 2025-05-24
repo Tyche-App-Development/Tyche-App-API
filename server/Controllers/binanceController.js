@@ -23,17 +23,7 @@ export const getBinanceBalance = async (req, res) => {
         const result = await client.account();
         const balances = result.data.balances;
 
-        let eurConversionRate = 1;
-        try {
-            const { data } = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=eur');
-            eurConversionRate = data?.tether?.eur;
-            if (!eurConversionRate) throw new Error('Missing EUR conversion rate');
-        } catch (e) {
-            console.warn('Error fetching EUR conversion rate:', e.message);
-            return res.status(500).json({ message: 'Failed to convert prices to EUR' });
-        }
-
-        let totalBalanceEUR = 0;
+        let totalBalanceUSD = 0;
         const detailedBalances = [];
 
         for (const asset of balances) {
@@ -49,19 +39,18 @@ export const getBinanceBalance = async (req, res) => {
 
             try {
                 const response = await axios.get(`https://testnet.binance.vision/api/v3/ticker/price?symbol=${pair}`);
-                console.log(`${pair} ->`, response.data);
+                const priceUSD = parseFloat(response.data.price);
+                const valueUSD = total * priceUSD;
 
-                const priceUSDT = parseFloat(response.data.price);
-                const priceEUR = priceUSDT * eurConversionRate;
-                const valueEUR = total * priceEUR;
+                totalBalanceUSD += valueUSD;
 
-                totalBalanceEUR += valueEUR;
+
 
                 detailedBalances.push({
                     asset: asset.asset,
                     amount: total,
-                    priceEUR,
-                    valueEUR
+                    priceUSD,
+                    valueUSD
                 });
             } catch (err) {
                 console.warn(`Price not available for ${pair}:`, err?.message || err);
@@ -70,12 +59,12 @@ export const getBinanceBalance = async (req, res) => {
 
         await prisma.user.update({
             where: { id: user.id },
-            data: { balance: totalBalanceEUR }
+            data: { balance: totalBalanceUSD }
         });
 
         res.json({
-            message: 'Total balance in EUR calculated successfully',
-            balanceEUR: totalBalanceEUR,
+            message: 'Total balance in USD calculated successfully',
+            balanceUSD: totalBalanceUSD,
             assets: detailedBalances
         });
 
@@ -105,6 +94,7 @@ export const getBinanceProfitPNL = async (req, res) => {
         const { assets } = balanceRes.data;
         const pnlData = [];
 
+
         for (const asset of assets) {
             const symbol = asset.asset + 'USDT';
             let allTrades = [];
@@ -113,6 +103,7 @@ export const getBinanceProfitPNL = async (req, res) => {
 
             try {
                 await client.exchangeInfo({ symbol });
+
                 while (hasMore) {
                     const params = { symbol, limit: 500 };
                     if (fromId) params.fromId = fromId;
@@ -132,6 +123,7 @@ export const getBinanceProfitPNL = async (req, res) => {
                 continue;
             }
 
+
             let totalBought = 0;
             let costBought = 0;
             let totalSold = 0;
@@ -149,13 +141,19 @@ export const getBinanceProfitPNL = async (req, res) => {
                 }
             }
 
+
             const amountStillHeld = totalBought - totalSold;
             if (amountStillHeld <= 0) continue;
 
             const currentAmount = parseFloat(asset.amount);
             const averageBuyPrice = costBought / totalBought;
             const effectiveCost = averageBuyPrice * amountStillHeld;
-            const currentPrice = asset.priceEUR;
+            const currentPrice = parseFloat(asset.priceUSD);
+            if (isNaN(currentPrice)) {
+                console.warn(`Invalid current price for asset ${asset.asset}: ${asset.priceUSD}`);
+                continue;
+            }
+
             const profit = (currentPrice - averageBuyPrice) * currentAmount;
             const pnlPercent = ((currentPrice - averageBuyPrice) / averageBuyPrice) * 100;
 
@@ -167,11 +165,13 @@ export const getBinanceProfitPNL = async (req, res) => {
                 totalSold: parseFloat(totalSold.toFixed(8)),
                 averageBuyPrice: parseFloat(averageBuyPrice.toFixed(4)),
                 effectiveCost: parseFloat(effectiveCost.toFixed(2)),
-                currentValue: parseFloat(currentPrice.toFixed(2)),
+                currentValue: parseFloat((currentPrice * currentAmount).toFixed(2)),
                 profit: parseFloat(profit.toFixed(2)),
                 pnlPercent: parseFloat(pnlPercent.toFixed(2))
             });
         }
+
+        console.log('Final PNL Data:', pnlData);
 
         res.json({
             message: 'Profit and PNL calculated successfully',
@@ -181,5 +181,32 @@ export const getBinanceProfitPNL = async (req, res) => {
     } catch (err) {
         console.error('Error calculating profit and PNL:', err);
         res.status(500).json({ message: 'Error calculating profit and PNL', error: err.message });
+    }
+};
+
+export const getBinanceTradeHistory = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return res.status(401).json({ message: 'Token not provided' });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const apiKey = decrypt(user.apiKey);
+        const apiSecret = decrypt(user.apiSecret);
+        const client = new Spot(apiKey, apiSecret, { baseURL: SPOT_REST_API_TESTNET_URL });
+
+        const tradesRes = await client.myTrades();
+        const trades = tradesRes.data;
+
+        res.json({
+            message: 'Trade history retrieved successfully',
+            trades
+        });
+
+    } catch (err) {
+        console.error('Error retrieving Binance trade history:', err);
+        res.status(500).json({ message: 'Error retrieving trade history', error: err.message });
     }
 };

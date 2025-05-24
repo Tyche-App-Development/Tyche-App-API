@@ -5,7 +5,7 @@ export function setupBinanceTickerSocket(server) {
     const wss = new WebSocketServer({ server });
     const exchange = new binance({ enableRateLimit: true });
 
-    const symbols = ['BTC/EUR', 'ETH/EUR', 'XRP/EUR', 'SOL/EUR', 'BNB/EUR'];
+    const symbols = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'SOL/USDT', 'BNB/USDT'];
     const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
     const currentCandles = {};

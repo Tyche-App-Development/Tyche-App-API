@@ -19,10 +19,10 @@ export const getCoinDetails = (req, res) => {
                     name: json.name,
                     symbol: json.symbol,
                     rank: json.market_cap_rank,
-                    market_cap_usd: json.market_data.market_cap.eur,
+                    market_cap_usd: json.market_data.market_cap.usd,
                     circulating_supply: json.market_data.circulating_supply,
-                    all_time_high: json.market_data.ath.eur,
-                    all_time_low: json.market_data.atl.eur,
+                    all_time_high: json.market_data.ath.usd,
+                    all_time_low: json.market_data.atl.usd,
                     issue_date: json.genesis_date
                 };
 
