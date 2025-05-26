@@ -6,7 +6,9 @@
     "ccxt": "^4.4.82",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "firebase-admin": "^13.4.0",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^4.0.7",
     "nodemon": "^3.1.9",
     "pg": "^8.14.1",
     "technicalindicators": "^1.0.7"

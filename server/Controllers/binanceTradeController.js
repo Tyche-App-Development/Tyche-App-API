@@ -14,28 +14,58 @@ export const executeTestTrade = async (req, res) => {
 
         const apiKey = decrypt(user.apiKey);
         const apiSecret = decrypt(user.apiSecret);
-
         const client = new Spot(apiKey, apiSecret, {
             baseURL: 'https://testnet.binance.vision',
         });
 
-        const symbol = req.body.symbol || 'BTCUSDT';
-        const quantity = req.body.quantity || '0.001';
+        const tradesToExecute = [
+            { symbol: 'BTCUSDT', quantity: '0.001' },
+            { symbol: 'XRPUSDT', quantity: '10' },
+            { symbol: 'SOLUSDT', quantity: '0.2' },
+            { symbol: 'BNBUSDT', quantity: '0.05' }
+        ];
 
-        const checkSymbol = await client.exchangeInfo({ symbol });
-        if (!checkSymbol || !checkSymbol.data.symbols.length) {
-            return res.status(400).json({ message: `Par ${symbol} não é suportado na Binance Testnet` });
+        const executedTrades = [];
+
+        for (const trade of tradesToExecute) {
+            try {
+                const checkSymbol = await client.exchangeInfo({ symbol: trade.symbol });
+                if (!checkSymbol || !checkSymbol.data.symbols.length) {
+                    executedTrades.push({
+                        symbol: trade.symbol,
+                        success: false,
+                        message: `Par ${trade.symbol} não é suportado.`
+                    });
+                    continue;
+                }
+
+                const order = await client.newOrder(trade.symbol, 'BUY', 'MARKET', { quantity: trade.quantity });
+
+                executedTrades.push({
+                    symbol: trade.symbol,
+                    success: true,
+                    message: `Trade executada com sucesso para ${trade.symbol}`,
+                    data: order.data
+                });
+
+            } catch (tradeErr) {
+                console.warn(`Erro ao executar trade para ${trade.symbol}:`, tradeErr.response?.data || tradeErr.message);
+                executedTrades.push({
+                    symbol: trade.symbol,
+                    success: false,
+                    message: `Erro ao executar trade para ${trade.symbol}`,
+                    error: tradeErr.response?.data || tradeErr.message
+                });
+            }
         }
 
-        const buy = await client.newOrder(symbol, 'BUY', 'MARKET', { quantity });
-
         res.json({
-            message: `Trade de compra executada com sucesso para ${symbol}`,
-            buyOrder: buy.data
+            message: 'Execução de múltiplas trades finalizada',
+            results: executedTrades
         });
 
     } catch (err) {
-        console.error('Erro ao executar trade de compra:', err.response?.data || err.message);
-        res.status(500).json({ message: 'Erro ao executar trade de compra na Binance', error: err.message });
+        console.error('Erro ao executar trades:', err.message);
+        res.status(500).json({ message: 'Erro ao executar trades na Binance', error: err.message });
     }
 };

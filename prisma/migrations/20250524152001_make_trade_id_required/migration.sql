@@ -18,10 +18,11 @@ CREATE TABLE "User" (
 -- CreateTable
 CREATE TABLE "HistoryTrade" (
     "id" TEXT NOT NULL,
+    "tradeId" INTEGER NOT NULL,
     "id_user" TEXT NOT NULL,
     "symbol" TEXT NOT NULL,
     "price" DOUBLE PRECISION NOT NULL,
-    "amount" INTEGER NOT NULL,
+    "amount" DOUBLE PRECISION NOT NULL,
     "quoteQuantity" DOUBLE PRECISION NOT NULL,
     "gain_loss" DOUBLE PRECISION NOT NULL,
     "isBuyer" BOOLEAN NOT NULL,
@@ -91,6 +92,9 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_nif_key" ON "User"("nif");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "HistoryTrade_tradeId_key" ON "HistoryTrade"("tradeId");
 
 -- AddForeignKey
 ALTER TABLE "HistoryTrade" ADD CONSTRAINT "HistoryTrade_id_user_fkey" FOREIGN KEY ("id_user") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

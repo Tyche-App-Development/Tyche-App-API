@@ -4,7 +4,9 @@ import cors from 'cors';
 import http from 'http';
 import authRoutes from './routes/authRoutes.js';
 import { setupBinanceTickerSocket } from './services/binanceTickerSocket.js';
-
+import { syncAllUsersBinanceData } from './services/syncBinance.js';
+import './Controllers/CryptoNewsNotification.js';
+import { sendCryptoNewsNotification } from './Controllers/CryptoNewsNotification.js';
 
 dotenv.config();
 
@@ -17,7 +19,15 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 
 
+ setInterval(() => {
+     syncAllUsersBinanceData();
+ }, 60 * 1000); // 2 segundos
+
 setupBinanceTickerSocket(server);
+
+syncAllUsersBinanceData();
+
+sendCryptoNewsNotification();
 
 // Start server
 const PORT = process.env.PORT || 3000;

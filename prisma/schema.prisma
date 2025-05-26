@@ -20,23 +20,27 @@ model User {
   apiSecret     String
   balance       Float
   imageProfile  Bytes?
+  pnl           Float   @default(0)
+  profit        Float   @default(0)
+  balanceDetails Json?
   nif           String          @unique
   historyTrades HistoryTrade[]
   strategies    UserStrategy[]
 }
 
 model HistoryTrade {
-  id           String   @id @default(uuid())
-  id_user      String
-  symbol       String
-  price        Float
-  amount       Int
+  id            String   @id @default(uuid())
+  tradeId       Int      @unique
+  id_user       String
+  symbol        String
+  price         Float
+  amount        Float
   quoteQuantity Float
-  gain_loss    Float
-  isBuyer      Boolean
-  timestamp    DateTime
+  gain_loss     Float
+  isBuyer       Boolean
+  timestamp     DateTime
 
-  user         User     @relation(fields: [id_user], references: [id])
+  user          User     @relation(fields: [id_user], references: [id])
 }
 
 model PriceData {
