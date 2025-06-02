@@ -1,14 +1,16 @@
 import { WebSocketServer } from 'ws';
 import { binance } from 'ccxt';
+import { SMA, RSI, MACD } from 'technicalindicators';
+import prisma from '../ConfigDatabase/db.js';
 
 export function setupBinanceTickerSocket(server) {
     const wss = new WebSocketServer({ server });
     const exchange = new binance({ enableRateLimit: true });
 
     const symbols = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'SOL/USDT', 'BNB/USDT'];
-    const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-
     const currentCandles = {};
+    const historicalCloses = {};
+    const historicalVolumes = {};
 
     function broadcast(data) {
         wss.clients.forEach(client => {
@@ -18,23 +20,33 @@ export function setupBinanceTickerSocket(server) {
         });
     }
 
-    wss.on('connection', async ws => {
-        console.log('WebSocket client connected');
+    async function initializeHistoricalData() {
+        const twoYearsAgo = Date.now() - 2 * 365 * 24 * 60 * 60 * 1000;
 
-        ws.on('message', async (msg) => {
+        for (const symbol of symbols) {
+            const ohlcv = await exchange.fetchOHLCV(symbol, '1d', twoYearsAgo);
+            historicalCloses[symbol] = ohlcv.map(c => c[4]);
+            historicalVolumes[symbol] = ohlcv.map(c => c[5]);
+        }
+    }
+
+    wss.on('connection', ws => {
+        console.log('WebSocket client connected');
+        ws.on('message', async msg => {
             try {
                 const data = JSON.parse(msg.toString());
                 if (data.type === 'get_klines' && symbols.includes(data.symbol)) {
-                    const klines = await exchange.fetchOHLCV(data.symbol, '1d', oneYearAgo);
+                    const twoYearsAgo = Date.now() - 2 * 365 * 24 * 60 * 60 * 1000;
+                    const klines = await exchange.fetchOHLCV(data.symbol, '1d', twoYearsAgo);
                     ws.send(JSON.stringify({
                         type: 'klines',
                         symbol: data.symbol,
                         data: klines
                     }));
-                    console.log(`Enviados klines manuais para ${data.symbol}`);
+                    console.log(`Klines sent for ${data.symbol}`);
                 }
             } catch (e) {
-                console.error('Erro ao processar mensagem WebSocket:', e.message);
+                console.error('Error processing WebSocket message:', e.message);
             }
         });
     });
@@ -46,7 +58,7 @@ export function setupBinanceTickerSocket(server) {
             try {
                 const ticker = await exchange.fetchTicker(symbol);
                 const price = ticker.last;
-
+                const volume = ticker.info?.quoteVolume || 0;
 
                 if (!currentCandles[symbol]) {
                     currentCandles[symbol] = {
@@ -68,9 +80,9 @@ export function setupBinanceTickerSocket(server) {
                 broadcast({
                     type: 'ticker',
                     symbol: ticker.symbol,
-                    price: price,
+                    price,
                     percent: ticker.percentage,
-                    volume: ticker.info?.quoteVolume || 0,
+                    volume,
                     time: new Date().toISOString()
                 });
 
@@ -86,11 +98,64 @@ export function setupBinanceTickerSocket(server) {
                     ]
                 });
 
+                historicalCloses[symbol].push(price);
+                historicalVolumes[symbol].push(volume);
+                if (historicalCloses[symbol].length > 100) {
+                    historicalCloses[symbol].shift();
+                    historicalVolumes[symbol].shift();
+                }
+
+                const ma7 = SMA.calculate({ period: 7, values: historicalCloses[symbol] }).slice(-1)[0] || 0;
+                const ma25 = SMA.calculate({ period: 25, values: historicalCloses[symbol] }).slice(-1)[0] || 0;
+                const ma99 = SMA.calculate({ period: 99, values: historicalCloses[symbol] }).slice(-1)[0] || 0;
+                const rsi = RSI.calculate({ period: 14, values: historicalCloses[symbol] }).slice(-1)[0] || 0;
+                const macd = MACD.calculate({
+                    values: historicalCloses[symbol],
+                    fastPeriod: 12,
+                    slowPeriod: 26,
+                    signalPeriod: 9,
+                    SimpleMAOscillator: false,
+                    SimpleMASignal: false
+                }).slice(-1)[0] || { MACD: 0, signal: 0, histogram: 0 };
+
+                await prisma.priceData.upsert({
+                    where: { id_symbol: symbol },
+                    update: {
+                        timestamp: new Date(now),
+                        price,
+                        volume: parseFloat(volume),
+                        ma_7: ma7,
+                        ma_25: ma25,
+                        ma_99: ma99,
+                        rsi,
+                        macd: macd.MACD,
+                        dea: macd.signal,
+                        diff: macd.histogram
+                    },
+                    create: {
+                        id_symbol: symbol,
+                        timestamp: new Date(now),
+                        price,
+                        volume: parseFloat(volume),
+                        ma_7: ma7,
+                        ma_25: ma25,
+                        ma_99: ma99,
+                        rsi,
+                        macd: macd.MACD,
+                        dea: macd.signal,
+                        diff: macd.histogram
+                    }
+                });
+
             } catch (error) {
-                console.error(`Error fetching ticker for ${symbol}:`, error.message);
+                console.error(`Error updating data for ${symbol}:`, error.message);
             }
         }
     }, 1000);
+
+    initializeHistoricalData().then(() => {
+        console.log('Historical data loaded for indicators.');
+    });
 
     return wss;
 }

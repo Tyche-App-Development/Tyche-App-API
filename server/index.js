@@ -5,6 +5,8 @@ import http from 'http';
 import authRoutes from './routes/authRoutes.js';
 import { setupBinanceTickerSocket } from './services/binanceTickerSocket.js';
 import { syncAllUsersBinanceData } from './services/syncBinance.js';
+ import {fetchAndStoreHistoryWithIndicators} from "./services/fetchAndStoreHistoryWithIndicators.js";
+ import { runAllBots } from './bot/botScheduler.js';
 
 dotenv.config();
 
@@ -23,7 +25,13 @@ app.use('/api/auth', authRoutes);
 
 setupBinanceTickerSocket(server);
 
+fetchAndStoreHistoryWithIndicators();
+
 syncAllUsersBinanceData();
+
+ setInterval(() => {
+     runAllBots();
+ }, 15 * 60 * 1000);
 
 
 // Start server

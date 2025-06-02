@@ -4,6 +4,7 @@ import {getProfile, updateProfile} from "../Controllers/userController.js";
 import {getCoinDetails} from "../Controllers/coingeckoController.js";
 import {getBinanceBalance, getBinanceProfitPNL, getBinanceTradeHistory} from "../Controllers/binanceController.js";
 import {executeTestTrade} from "../Controllers/binanceTradeController.js";
+import {createUserStrategy} from "../Controllers/strategyController.js";
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.get('/profitpnl', getBinanceProfitPNL);
 router.post('/binance/trade', executeTestTrade);
 router.get('/historytrade', getBinanceTradeHistory)
 
+router.post('/user-strategy', createUserStrategy);
 
 
 

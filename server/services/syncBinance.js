@@ -15,7 +15,6 @@ export async function syncAllUsersBinanceData() {
             const apiSecret = decrypt(user.apiSecret);
             const client = new Spot(apiKey, apiSecret, { baseURL: SPOT_REST_API_TESTNET_URL });
 
-            // --- BALANCE ---
             const result = await client.account();
             const balances = result.data.balances;
             let totalBalanceUSD = 0;
@@ -41,7 +40,7 @@ export async function syncAllUsersBinanceData() {
                         valueUSD: parseFloat(valueUSD.toFixed(2))
                     });
                 } catch (err) {
-                    console.warn(`Erro ao obter preço de ${pair}:`, err.message);
+                    console.warn(`Failed to fetch price for ${pair}:`, err.message);
                 }
             }
 
@@ -53,7 +52,6 @@ export async function syncAllUsersBinanceData() {
                 }
             });
 
-            // --- TRADES & GAIN/LOSS ---
             for (const symbol of ['BTCUSDT', 'ETHUSDT', 'XRPUSDT', 'SOLUSDT', 'BNBUSDT']) {
                 try {
                     const tradesRes = await client.myTrades(symbol);
@@ -98,11 +96,10 @@ export async function syncAllUsersBinanceData() {
                         }
                     }
                 } catch (err) {
-                    console.warn(`Erro ao sincronizar trades de ${symbol} para o user ${user.id}:`, err.message);
+                    console.warn(`Failed to sync trades for ${symbol} (user ${user.id}):`, err.message);
                 }
             }
 
-            // --- PROFIT & PNL ---
             let totalProfit = 0;
             let totalEffectiveCost = 0;
 
@@ -130,7 +127,7 @@ export async function syncAllUsersBinanceData() {
                         }
                     }
                 } catch (err) {
-                    console.warn(`❌ Erro ao obter trades para ${symbol}:`, err.message);
+                    console.warn(`Failed to fetch trades for ${symbol}:`, err.message);
                     continue;
                 }
 
@@ -174,9 +171,9 @@ export async function syncAllUsersBinanceData() {
             });
 
         } catch (err) {
-            console.warn(`❌ Falha ao sincronizar utilizador ${user.id}:`, err.message);
+            console.warn(`Failed to sync user ${user.id}:`, err.message);
         }
     }
 
-    console.log(`[SYNC] ✅ Finalizada sincronização de saldo, trades e PNL às ${new Date().toISOString()}`);
+    console.log(`[SYNC] Completed balance, trades, and PNL sync at ${new Date().toISOString()}`);
 }
