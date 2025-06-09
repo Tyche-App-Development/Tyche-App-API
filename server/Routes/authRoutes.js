@@ -2,7 +2,12 @@ import express from 'express';
 import {register, login, logout} from '../controllers/authController.js';
 import {getProfile, updateProfile} from "../Controllers/userController.js";
 import {getCoinDetails} from "../Controllers/coingeckoController.js";
-import {getBinanceBalance, getBinanceProfitPNL, getBinanceTradeHistory} from "../Controllers/binanceController.js";
+import {
+    getBinanceBalance,
+    getBinanceProfitPNL,
+    getBinanceTradeHistory,
+    getUserUSDTBalanceEndpoint
+} from "../Controllers/binanceController.js";
 import {executeTestTrade} from "../Controllers/binanceTradeController.js";
 import {createUserStrategy} from "../Controllers/strategyController.js";
 
@@ -23,6 +28,8 @@ router.get('/historytrade', getBinanceTradeHistory)
 
 router.post('/user-strategy', createUserStrategy);
 
+
+router.get('/balanceusdt', getUserUSDTBalanceEndpoint);
 
 
 

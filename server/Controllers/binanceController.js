@@ -86,9 +86,6 @@ export const getBinanceBalance = async (req, res) => {
     }
 };
 
-
-
-
 export const getBinanceProfitPNL = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -275,6 +272,57 @@ export const getBinanceTradeHistory = async (req, res) => {
     } catch (err) {
         console.error('Error retrieving trade history:', err);
         res.status(500).json({ message: 'Error retrieving trade history', error: err.message });
+    }
+};
+
+
+export const getUserUSDTBalanceEndpoint = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return res.status(401).json({ message: 'Token not provided' });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const apiKey = decrypt(user.apiKey);
+        const apiSecret = decrypt(user.apiSecret);
+        const client = new Spot(apiKey, apiSecret, { baseURL: SPOT_REST_API_TESTNET_URL });
+
+        const result = await client.account();
+        const balances = result.data.balances;
+
+        const usdtAsset = balances.find(asset => asset.asset === 'USDT');
+        if (!usdtAsset) {
+            return res.status(200).json({ message: 'USDT not found', usdt: null });
+        }
+
+        const free = parseFloat(usdtAsset.free);
+        const locked = parseFloat(usdtAsset.locked);
+        const total = free + locked;
+
+        if (total <= 0) {
+            return res.status(200).json({ message: 'No USDT balance', usdt: null });
+        }
+
+        const priceUSD = 1;
+        const valueUSD = total * priceUSD;
+
+        const usdt = {
+            asset: 'USDT',
+            amount: total,
+            priceUSD: priceUSD,
+            valueUSD: parseFloat(valueUSD.toFixed(2))
+        };
+
+        res.status(200).json({
+            message: 'USDT balance found',
+            usdt
+        });
+
+    } catch (err) {
+        console.error('Erro ao obter saldo de USDT:', err);
+        res.status(500).json({ message: 'Erro interno ao obter saldo de USDT', error: err.message });
     }
 };
 
