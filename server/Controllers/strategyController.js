@@ -82,3 +82,130 @@ export const createUserStrategy = async (req, res) => {
         res.status(500).json({ message: 'Internal server error', error: err.message });
     }
 };
+
+
+export const getUserStrategyInfo = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return res.status(401).json({ message: 'Token not provided' });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Buscar TODAS as estratégias ativas do usuário
+        const userStrategies = await prisma.userStrategy.findMany({
+            where: {
+                id_user: user.id,
+                status: true
+            },
+            include: {
+                bot: true,
+                priceData: true
+            },
+            orderBy: {
+                updated_at: 'desc'
+            }
+        });
+
+        if (userStrategies.length === 0) {
+            return res.status(404).json({ message: 'Nenhuma estratégia encontrada' });
+        }
+
+        // Processar todas as estratégias
+        const strategiesData = userStrategies.map(userStrategy => {
+            const pnlValue = userStrategy.currentBalance - userStrategy.initialBalance;
+            const pnlPercentage = ((userStrategy.currentBalance - userStrategy.initialBalance) / userStrategy.initialBalance) * 100;
+
+            return {
+                id: userStrategy.id,
+                botName: userStrategy.bot.strategyName,
+                pnl: {
+                    value: parseFloat(pnlValue.toFixed(2)),
+                    percentage: parseFloat(pnlPercentage.toFixed(2))
+                },
+                balance: {
+                    current: userStrategy.currentBalance,
+                    initial: userStrategy.initialBalance,
+                    held: userStrategy.amountHeld
+                },
+                trading: {
+                    pair: `${userStrategy.priceData.symbol || 'BTC'}/EUR`,
+                    currentPrice: userStrategy.priceData.price,
+                    priceChange: userStrategy.priceData.changePercent || 0
+                },
+                position: {
+                    inPosition: userStrategy.inPosition,
+                    buyPrice: userStrategy.buy_price,
+                    lastAction: userStrategy.lastAction
+                },
+                botConfig: {
+                    risk: userStrategy.bot.strategyRisk,
+                    description: userStrategy.bot.strategyDescription,
+                    timeInterval: userStrategy.bot.timeInterval
+                },
+                createdAt: userStrategy.created_at,
+                updatedAt: userStrategy.updated_at
+            };
+        });
+
+        res.status(200).json({
+            message: "Strategy data found",
+            count: strategiesData.length,
+            strategies: strategiesData
+        });
+
+        // Atualizar preços em background para todas as estratégias
+        setImmediate(async () => {
+            try {
+                for (const userStrategy of userStrategies) {
+                    const symbol = userStrategy.priceData.symbol || 'BTCUSDT';
+
+                    try {
+                        // Buscar preço atual da Binance
+                        const priceResponse = await axios.get(
+                            `https://testnet.binance.vision/api/v3/ticker/24hr?symbol=${symbol}`
+                        );
+
+                        const currentPrice = parseFloat(priceResponse.data.lastPrice);
+                        const priceChangePercent = parseFloat(priceResponse.data.priceChangePercent);
+
+                        // Atualizar dados de preço
+                        await prisma.priceData.update({
+                            where: { id: userStrategy.id_priceData },
+                            data: {
+                                price: currentPrice,
+                                changePercent: priceChangePercent,
+                                updated_at: new Date()
+                            }
+                        });
+
+                        // Recalcular saldo atual se estiver em posição
+                        if (userStrategy.inPosition && userStrategy.amountHeld > 0) {
+                            const newCurrentBalance = userStrategy.initialBalance +
+                                (currentPrice - userStrategy.buy_price) * userStrategy.amountHeld;
+
+                            await prisma.userStrategy.update({
+                                where: { id: userStrategy.id },
+                                data: {
+                                    currentBalance: newCurrentBalance,
+                                    updated_at: new Date()
+                                }
+                            });
+                        }
+
+                        console.log(`Updated strategy ${userStrategy.id}: ${symbol} = $${currentPrice}`);
+                    } catch (priceError) {
+                        console.error(`Failed to update price for strategy ${userStrategy.id}:`, priceError.message);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to update strategies in background:', err.message);
+            }
+        });
+
+    } catch (err) {
+        console.error('Error retrieving strategy info:', err);
+        res.status(500).json({ message: 'Error retrieving strategy info', error: err.message });
+    }
+};

@@ -10,6 +10,8 @@ import {
 } from "../Controllers/binanceController.js";
 import {executeTestTrade} from "../Controllers/binanceTradeController.js";
 import {createUserStrategy} from "../Controllers/strategyController.js";
+import { getUserStrategyInfo } from '../Controllers/strategyController.js';
+
 
 const router = express.Router();
 
@@ -30,6 +32,7 @@ router.post('/user-strategy', createUserStrategy);
 
 
 router.get('/balanceusdt', getUserUSDTBalanceEndpoint);
+router.get('/strategy/info', getUserStrategyInfo);
 
 
 
