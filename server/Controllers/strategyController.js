@@ -93,7 +93,6 @@ export const getUserStrategyInfo = async (req, res) => {
         const user = await prisma.user.findUnique({ where: { id: decoded.id } });
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        // Buscar TODAS as estratégias ativas do usuário
         const userStrategies = await prisma.userStrategy.findMany({
             where: {
                 id_user: user.id,
@@ -112,7 +111,6 @@ export const getUserStrategyInfo = async (req, res) => {
             return res.status(404).json({ message: 'Nenhuma estratégia encontrada' });
         }
 
-        // Processar todas as estratégias
         const strategiesData = userStrategies.map(userStrategy => {
             const pnlValue = userStrategy.currentBalance - userStrategy.initialBalance;
             const pnlPercentage = ((userStrategy.currentBalance - userStrategy.initialBalance) / userStrategy.initialBalance) * 100;
@@ -130,7 +128,7 @@ export const getUserStrategyInfo = async (req, res) => {
                     held: userStrategy.amountHeld
                 },
                 trading: {
-                    pair: `${userStrategy.priceData.symbol || 'BTC'}/EUR`,
+                    pair: `${userStrategy.priceData.id_symbol || 'BTC'}`,
                     currentPrice: userStrategy.priceData.price,
                     priceChange: userStrategy.priceData.changePercent || 0
                 },
@@ -155,14 +153,12 @@ export const getUserStrategyInfo = async (req, res) => {
             strategies: strategiesData
         });
 
-        // Atualizar preços em background para todas as estratégias
         setImmediate(async () => {
             try {
                 for (const userStrategy of userStrategies) {
                     const symbol = userStrategy.priceData.symbol || 'BTCUSDT';
 
                     try {
-                        // Buscar preço atual da Binance
                         const priceResponse = await axios.get(
                             `https://testnet.binance.vision/api/v3/ticker/24hr?symbol=${symbol}`
                         );
@@ -170,7 +166,6 @@ export const getUserStrategyInfo = async (req, res) => {
                         const currentPrice = parseFloat(priceResponse.data.lastPrice);
                         const priceChangePercent = parseFloat(priceResponse.data.priceChangePercent);
 
-                        // Atualizar dados de preço
                         await prisma.priceData.update({
                             where: { id: userStrategy.id_priceData },
                             data: {
@@ -180,7 +175,6 @@ export const getUserStrategyInfo = async (req, res) => {
                             }
                         });
 
-                        // Recalcular saldo atual se estiver em posição
                         if (userStrategy.inPosition && userStrategy.amountHeld > 0) {
                             const newCurrentBalance = userStrategy.initialBalance +
                                 (currentPrice - userStrategy.buy_price) * userStrategy.amountHeld;
